@@ -124,6 +124,8 @@ class CoinJoinOrder(object):
 		                   + str(ins['outpoint']['index']) for ins in txd['ins']])
 		#complete authentication: check the tx input uses the authing pubkey
 		input_utxo_data = common.bc_interface.query_utxo_set(list(tx_utxo_set))
+		if None in input_utxo_data:
+			return False, 'some utxos already spent or not confirmed yet'
 		input_addresses = [u['address'] for u in input_utxo_data]
 		if btc.pubtoaddr(self.i_utxo_pubkey, get_addr_vbyte())\
 			not in input_addresses:
@@ -213,13 +215,16 @@ class Maker(CoinJoinerPeer):
 		debug('received txhex from ' + nick + ' to push\n' + txhex)
 		txid = common.bc_interface.pushtx(txhex)
 		debug('pushed tx ' + str(txid))
+		if txid == None:
+			self.send_error(nick, 'Unable to push tx')
 
 	def on_welcome(self):
 		self.msgchan.announce_orders(self.orderlist)
 		self.active_orders = {}
 		
 	def on_nick_leave(self, nick):
-		self.active_orders[nick] = None
+                if nick in self.active_orders:
+                        del self.active_orders[nick]
 
 	def modify_orders(self, to_cancel, to_announce):
 		debug('modifying orders. to_cancel=' + str(to_cancel) + '\nto_announce=' + str(to_announce))
